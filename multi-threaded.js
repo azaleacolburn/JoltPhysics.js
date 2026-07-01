@@ -3,7 +3,9 @@ if (ENVIRONMENT_IS_PTHREAD) {
 	const _invokeEntryPoint = invokeEntryPoint;
 	invokeEntryPoint = (ptr, arg) => {
 		if (arg.script) {
-			import(arg.script).then(module => {
+			// Workaround for bug: https://github.com/jrouwe/JoltPhysics.js/issues/245
+			// `replace_by_import` gets replaced by `import`
+			replace_by_import(arg.script).then(module => {
 				module.default(Module, arg.params).then(() => _invokeEntryPoint(ptr, arg.value));
 			})
 		} else {

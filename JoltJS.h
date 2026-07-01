@@ -114,6 +114,8 @@ using SoftBodySharedSettingsInvBind = SoftBodySharedSettings::InvBind;
 using SoftBodySharedSettingsSkinWeight = SoftBodySharedSettings::SkinWeight;
 using SoftBodySharedSettingsSkinned = SoftBodySharedSettings::Skinned;
 using SoftBodySharedSettingsLRA = SoftBodySharedSettings::LRA;
+using SoftBodySharedSettingsRodStretchShear = SoftBodySharedSettings::RodStretchShear;
+using SoftBodySharedSettingsRodBendTwist = SoftBodySharedSettings::RodBendTwist;
 using SoftBodySharedSettingsVertexAttributes = SoftBodySharedSettings::VertexAttributes;
 using CollideShapeResultFace = CollideShapeResult::Face;
 using ArraySoftBodySharedSettingsVertex = Array<SoftBodySharedSettingsVertex>;
@@ -125,6 +127,8 @@ using ArraySoftBodySharedSettingsInvBind = Array<SoftBodySharedSettingsInvBind>;
 using ArraySoftBodySharedSettingsSkinWeight = Array<SoftBodySharedSettingsSkinWeight>;
 using ArraySoftBodySharedSettingsSkinned = Array<SoftBodySharedSettingsSkinned>;
 using ArraySoftBodySharedSettingsLRA = Array<SoftBodySharedSettingsLRA>;
+using ArraySoftBodySharedSettingsRodStretchShear = Array<SoftBodySharedSettingsRodStretchShear>;
+using ArraySoftBodySharedSettingsRodBendTwist = Array<SoftBodySharedSettingsRodBendTwist>;
 using ArraySoftBodySharedSettingsVertexAttributes = Array<SoftBodySharedSettingsVertexAttributes>;
 using ArraySoftBodyVertex = Array<SoftBodyVertex>;
 using EGroundState = CharacterBase::EGroundState;
@@ -333,6 +337,11 @@ constexpr SoftBodySharedSettings_ELRAType SoftBodySharedSettings_ELRAType_None =
 constexpr SoftBodySharedSettings_ELRAType SoftBodySharedSettings_ELRAType_EuclideanDistance = SoftBodySharedSettings::ELRAType::EuclideanDistance;
 constexpr SoftBodySharedSettings_ELRAType SoftBodySharedSettings_ELRAType_GeodesicDistance = SoftBodySharedSettings::ELRAType::GeodesicDistance;
 
+// Alias for EBuildQuality
+using MeshShapeSettings_EBuildQuality = MeshShapeSettings::EBuildQuality;
+constexpr MeshShapeSettings_EBuildQuality MeshShapeSettings_EBuildQuality_FavorRuntimePerformance = MeshShapeSettings::EBuildQuality::FavorRuntimePerformance;
+constexpr MeshShapeSettings_EBuildQuality MeshShapeSettings_EBuildQuality_FavorBuildSpeed = MeshShapeSettings::EBuildQuality::FavorBuildSpeed;
+
 // Helper class to store information about the memory layout of SoftBodyVertex
 class SoftBodyVertexTraits
 {
@@ -355,19 +364,13 @@ static void TraceImpl(const char *inFMT, ...)
 	cout << buffer << endl;
 }
 
-#ifdef JPH_ENABLE_ASSERTS
-
-// Callback for asserts
-static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, uint inLine)
-{ 
-	// Print to the TTY
-	cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << endl;
-
-	// Breakpoint
-	return true;
+/// A wrapper around the assert failed handler that is compatible with JavaScript
+class AssertFailedHandler
+{
+public:
+	virtual					~AssertFailedHandler() = default;
+	virtual void			OnAssertFailed(const char *inExpression, const char *inMessage, const char *inFile, uint inLine) = 0;
 };
-
-#endif // JPH_ENABLE_ASSERTS
 
 /// Settings to pass to constructor
 class JoltSettings
@@ -381,6 +384,7 @@ public:
 	BroadPhaseLayerInterface *mBroadPhaseLayerInterface = nullptr;
 	ObjectVsBroadPhaseLayerFilter *mObjectVsBroadPhaseLayerFilter = nullptr;
 	ObjectLayerPairFilter *	mObjectLayerPairFilter = nullptr;
+	AssertFailedHandler *	mAssertFailedHandler = nullptr;
 };
 
 /// Main API for JavaScript
@@ -390,9 +394,24 @@ public:
 	/// Constructor
 							JoltInterface(const JoltSettings &inSettings)
 	{
-		// Install callbacks
+		// Install trace handler
 		Trace = TraceImpl;
-		JPH_IF_ENABLE_ASSERTS(AssertFailed = AssertFailedImpl;)
+
+		// Install assert handler
+#ifdef JPH_ENABLE_ASSERTS
+		sAssertFailedHandler = inSettings.mAssertFailedHandler;
+		AssertFailed = [](const char *inExpression, const char *inMessage, const char *inFile, uint inLine)
+		{
+			// Log the assert
+			if (sAssertFailedHandler != nullptr)
+				sAssertFailedHandler->OnAssertFailed(inExpression, inMessage != nullptr ? inMessage : "", inFile, inLine);
+			else
+				cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << endl;
+
+			// No breakpoint
+			return false;
+		};
+#endif // JPH_ENABLE_ASSERTS
 
 		// Create a factory
 		Factory::sInstance = new Factory();
@@ -435,6 +454,9 @@ public:
 		delete Factory::sInstance;
 		Factory::sInstance = nullptr;
 		UnregisterTypes();
+#ifdef JPH_ENABLE_ASSERTS
+		sAssertFailedHandler = nullptr;
+#endif
 	}
 
 	/// Step the world
@@ -484,6 +506,12 @@ public:
 		return total_memory - dynamic_top + i.fordblks;
 	}
 
+	/// Access to Body::sFixedToWorld, we can't expose it in a different way
+	static Body *			sGetFixedToWorldBody()
+	{
+		return &Body::sFixedToWorld;
+	}
+
 private:
 	TempAllocatorImpl *		mTempAllocator = nullptr;
 	JobSystemThreadPool *	mJobSystem = nullptr;
@@ -491,6 +519,9 @@ private:
 	ObjectVsBroadPhaseLayerFilter *mObjectVsBroadPhaseLayerFilter = nullptr;
 	ObjectLayerPairFilter *	mObjectLayerPairFilter = nullptr;
 	PhysicsSystem *			mPhysicsSystem = nullptr;
+#ifdef JPH_ENABLE_ASSERTS
+	inline static AssertFailedHandler *sAssertFailedHandler = nullptr;
+#endif
 };
 
 /// Helper class to extract triangles from the shape
@@ -569,6 +600,24 @@ private:
 	Array<const PhysicsMaterial *>	mMaterials;
 };
 
+/// A wrapper around BodyActivationListener that is compatible with JavaScript
+class BodyActivationListenerEm : public BodyActivationListener
+{
+public:
+	virtual void			OnBodyActivated(const BodyID &inBodyID, uint32 inBodyUserData) = 0;
+	virtual void			OnBodyDeactivated(const BodyID &inBodyID, uint32 inBodyUserData) = 0;
+
+	virtual void			OnBodyActivated(const BodyID &inBodyID, uint64 inBodyUserData)
+	{
+		OnBodyActivated(inBodyID, (uint32)inBodyUserData);
+	}
+
+	virtual void			OnBodyDeactivated(const BodyID &inBodyID, uint64 inBodyUserData)
+	{
+		OnBodyDeactivated(inBodyID, (uint32)inBodyUserData);
+	}
+};
+
 /// A wrapper around ContactListener that is compatible with JavaScript
 class ContactListenerEm: public ContactListener
 {
@@ -603,7 +652,9 @@ class CharacterContactListenerEm: public CharacterContactListener
 public:
 	// JavaScript compatible virtual functions
 	virtual void			OnContactAdded(const CharacterVirtual *inCharacter, const BodyID &inBodyID2, const SubShapeID &inSubShapeID2, const RVec3 *inContactPosition, const Vec3 *inContactNormal, CharacterContactSettings &ioSettings) = 0;
+	virtual void			OnContactPersisted(const CharacterVirtual *inCharacter, const BodyID &inBodyID2, const SubShapeID &inSubShapeID2, const RVec3 *inContactPosition, const Vec3 *inContactNormal, CharacterContactSettings &ioSettings) = 0;
 	virtual void			OnCharacterContactAdded(const CharacterVirtual *inCharacter, const CharacterVirtual *inOtherCharacter, const SubShapeID &inSubShapeID2, const RVec3 *inContactPosition, const Vec3 *inContactNormal, CharacterContactSettings &ioSettings) = 0;
+	virtual void			OnCharacterContactPersisted(const CharacterVirtual *inCharacter, const CharacterVirtual *inOtherCharacter, const SubShapeID &inSubShapeID2, const RVec3 *inContactPosition, const Vec3 *inContactNormal, CharacterContactSettings &ioSettings) = 0;
 	virtual void			OnContactSolve(const CharacterVirtual *inCharacter, const BodyID &inBodyID2, const SubShapeID &inSubShapeID2, const RVec3 *inContactPosition, const Vec3 *inContactNormal, const Vec3 *inContactVelocity, const PhysicsMaterial *inContactMaterial, const Vec3 *inCharacterVelocity, Vec3 &ioNewCharacterVelocity) = 0;
 	virtual void			OnCharacterContactSolve(const CharacterVirtual *inCharacter, const CharacterVirtual *inOtherCharacter, const SubShapeID &inSubShapeID2, const RVec3 *inContactPosition, const Vec3 *inContactNormal, const Vec3 *inContactVelocity, const PhysicsMaterial *inContactMaterial, const Vec3 *inCharacterVelocity, Vec3 &ioNewCharacterVelocity) = 0;
 
@@ -613,9 +664,19 @@ public:
 		OnContactAdded(inCharacter, inBodyID2, inSubShapeID2, &inContactPosition, &inContactNormal, ioSettings);
 	}
 
+	virtual void			OnContactPersisted(const CharacterVirtual *inCharacter, const BodyID &inBodyID2, const SubShapeID &inSubShapeID2, RVec3Arg inContactPosition, Vec3Arg inContactNormal, CharacterContactSettings &ioSettings) override
+	{ 
+		OnContactPersisted(inCharacter, inBodyID2, inSubShapeID2, &inContactPosition, &inContactNormal, ioSettings);
+	}
+
 	virtual void			OnCharacterContactAdded(const CharacterVirtual *inCharacter, const CharacterVirtual *inOtherCharacter, const SubShapeID &inSubShapeID2, RVec3Arg inContactPosition, Vec3Arg inContactNormal, CharacterContactSettings &ioSettings) override
 	{ 
 		OnCharacterContactAdded(inCharacter, inOtherCharacter, inSubShapeID2, &inContactPosition, &inContactNormal, ioSettings);
+	}
+
+	virtual void			OnCharacterContactPersisted(const CharacterVirtual *inCharacter, const CharacterVirtual *inOtherCharacter, const SubShapeID &inSubShapeID2, RVec3Arg inContactPosition, Vec3Arg inContactNormal, CharacterContactSettings &ioSettings) override
+	{ 
+		OnCharacterContactPersisted(inCharacter, inOtherCharacter, inSubShapeID2, &inContactPosition, &inContactNormal, ioSettings);
 	}
 
 	virtual void			OnContactSolve(const CharacterVirtual *inCharacter, const BodyID &inBodyID2, const SubShapeID &inSubShapeID2, RVec3Arg inContactPosition, Vec3Arg inContactNormal, Vec3Arg inContactVelocity, const PhysicsMaterial *inContactMaterial, Vec3Arg inCharacterVelocity, Vec3 &ioNewCharacterVelocity) override

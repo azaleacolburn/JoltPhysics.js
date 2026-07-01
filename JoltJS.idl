@@ -8,6 +8,7 @@ interface JPHString {
 };
 
 interface ArrayVec3 {
+	void ArrayVec3();
 	boolean empty();
 	long size();
 	[Ref] Vec3 at(long inIndex);
@@ -19,6 +20,7 @@ interface ArrayVec3 {
 };
 
 interface ArrayQuat {
+	void ArrayQuat();
 	boolean empty();
 	long size();
 	[Ref] Quat at(long inIndex);
@@ -30,6 +32,7 @@ interface ArrayQuat {
 };
 
 interface ArrayMat44 {
+	void ArrayMat44();
 	boolean empty();
 	long size();
 	[Ref] Mat44 at(long inIndex);
@@ -41,6 +44,7 @@ interface ArrayMat44 {
 };
 
 interface ArrayBodyID {
+	void ArrayBodyID();
 	boolean empty();
 	long size();
 	[Ref] BodyID at(long inIndex);
@@ -52,6 +56,7 @@ interface ArrayBodyID {
 };
 
 interface ArrayBodyPtr {
+	void ArrayBodyPtr();
 	boolean empty();
 	long size();
 	Body at(long inIndex);
@@ -254,6 +259,11 @@ enum SoftBodySharedSettings_ELRAType {
 	"SoftBodySharedSettings_ELRAType_GeodesicDistance"
 };
 
+enum MeshShapeSettings_EBuildQuality {
+	"MeshShapeSettings_EBuildQuality_FavorRuntimePerformance",
+	"MeshShapeSettings_EBuildQuality_FavorBuildSpeed"
+};
+
 interface Vec3MemRef {
 };
 
@@ -283,6 +293,7 @@ interface Vec3 {
 	void Vec3([Const, Ref] Float3 inV);
 	void Vec3(float inX, float inY, float inZ);
 	[Value] static Vec3 sZero();
+	[Value] static Vec3 sOne();
 	[Value] static Vec3 sAxisX();
 	[Value] static Vec3 sAxisY();
 	[Value] static Vec3 sAxisZ();
@@ -345,6 +356,7 @@ interface RVec3 {
 	void RVec3();
 	void RVec3(double inX, double inY, double inZ);
 	[Value] static RVec3 sZero();
+	[Value] static RVec3 sOne();
 	[Value] static RVec3 sAxisX();
 	[Value] static RVec3 sAxisY();
 	[Value] static RVec3 sAxisZ();
@@ -393,9 +405,11 @@ interface Vec4 {
 	void Vec4([Ref] Vec3 inV, float inW);
 	void Vec4(float inX, float inY, float inZ, float inW);
 	[Value] static Vec4 sZero();
+	[Value] static Vec4 sOne();
 	[Value] static Vec4 sReplicate(float inV);
 	[Value] static Vec4 sMin([Const, Ref] Vec4 inLHS, [Const, Ref] Vec4 inRHS);
 	[Value] static Vec4 sMax([Const, Ref] Vec4 inLHS, [Const, Ref] Vec4 inRHS);
+	[Value] static Vec4 sClamp([Const, Ref] Vec4 inValue, [Const, Ref] Vec4 inMin, [Const, Ref] Vec4 inMax);
 	[Value] static Vec4 sFusedMultiplyAdd([Const, Ref] Vec4 inMul1, [Const, Ref] Vec4 inMul2, [Const, Ref] Vec4 inAdd);
 	[Value] static Vec4 sOr([Const, Ref] Vec4 inV1, [Const, Ref] Vec4 inV2);
 	[Value] static Vec4 sXor([Const, Ref] Vec4 inV1, [Const, Ref] Vec4 inV2);
@@ -411,7 +425,10 @@ interface Vec4 {
 	void Set(float inX, float inY, float inZ, float inW);
 	[Operator="[]"] float GetComponent(unsigned long inCoordinate);
 	boolean IsClose([Const, Ref] Vec4 inV, optional float inMaxDistSq);
+	boolean IsNearZero(optional float inMaxDistSq);
 	boolean IsNormalized(optional float inTolerance);
+	long GetLowestComponentIndex();
+	long GetHighestComponentIndex();
 	[Operator="+=", Ref] Vec4 Add([Const, Ref] Vec4 inV);
 	[Operator="-=", Ref] Vec4 Sub([Const, Ref] Vec4 inV);
 	[Operator="*=", Ref] Vec4 Mul(float inV);
@@ -472,6 +489,7 @@ interface Quat {
 	void SetZ(float inZ);
 	void SetW(float inW);
 	void Set(float inX, float inY, float inZ, float inW);
+	[Const, Value] Quat sMultiplyImaginary([Const, Ref] Vec3 inLHS, [Const, Ref] Quat inRHS);
 	[Const, Value] Vec3 InverseRotate([Const, Ref] Vec3 inV);
 	[Const, Value] Vec3 RotateAxisX();
 	[Const, Value] Vec3 RotateAxisY();
@@ -652,6 +670,10 @@ interface AABox {
 interface OrientedBox {
 	void OrientedBox();
 	void OrientedBox([Const, Ref] Mat44 inOrientation, [Const, Ref] Vec3 inHalfExtents);
+	void OrientedBox([Const, Ref] Mat44 inOrientation, [Const, Ref] AABox inBox);
+
+    boolean Overlaps([Const, Ref] AABox inBox, optional float inEpsilon=1.0=-6f);
+    boolean Overlaps([Const, Ref] OrientedBox inBox, optional float inEpsilon=1.0=-6f);
 
 	[Value] attribute Mat44 mOrientation;
 	[Value] attribute Vec3 mHalfExtents;
@@ -849,7 +871,7 @@ interface ShapeSettings {
 	[Value] ShapeResult Create();
 	void ClearCachedResult();
 
-	attribute unsigned long long mUserData;
+	attribute unsigned long mUserData;
 };
 
 interface Shape {
@@ -862,15 +884,15 @@ interface Shape {
 	[Value] AABox GetLocalBounds();
 	[Value] AABox GetWorldSpaceBounds([Const, Ref] Mat44 inCenterOfMassTransform, [Const, Ref] Vec3 inScale);
 	[Value] Vec3 GetCenterOfMass();
-	unsigned long long GetUserData();
-	void SetUserData(unsigned long long inUserData);
+	unsigned long GetUserData();
+	void SetUserData(unsigned long inUserData);
 	unsigned long GetSubShapeIDBitsRecursive();
 	float GetInnerRadius();
 	[Value] MassProperties GetMassProperties();
 	[Const] Shape GetLeafShape([Const, Ref] SubShapeID inSubShapeID, [Ref] SubShapeID outRemainder);
 	[Const] PhysicsMaterial GetMaterial([Const, Ref] SubShapeID inSubShapeID);
 	[Value] Vec3 GetSurfaceNormal([Const, Ref] SubShapeID inSubShapeID, [Const, Ref] Vec3 inLocalSurfacePosition);
-	unsigned long long GetSubShapeUserData([Const, Ref] SubShapeID inSubShapeID);
+	unsigned long GetSubShapeUserData([Const, Ref] SubShapeID inSubShapeID);
 	[Value] TransformedShape GetSubShapeTransformedShape([Const, Ref] SubShapeID inSubShapeID, [Const, Ref] Vec3 inPositionCOM, [Const, Ref] Quat inRotation, [Const, Ref] Vec3 inScale, [Ref] SubShapeID outRemainder);
 	float GetVolume();
 	boolean IsValidScale([Const, Ref] Vec3 inScale);
@@ -1031,7 +1053,9 @@ ConvexHullShape implements ConvexShape;
 
 // Compound shape
 interface CompoundShapeSettings {
-	void AddShape([Const, Ref] Vec3 inPosition, [Const, Ref] Quat inRotation, [Const] ShapeSettings inShape, unsigned long inUserData);
+	void AddShape([Const, Ref] Vec3 inPosition, [Const, Ref] Quat inRotation, [Const] ShapeSettings inShape, unsigned long inUserData); // Deprecated
+	[BindTo="AddShape"] void AddShapeShapeSettings([Const, Ref] Vec3 inPosition, [Const, Ref] Quat inRotation, [Const] ShapeSettings inShape, unsigned long inUserData);
+	[BindTo="AddShape"] void AddShapeShape([Const, Ref] Vec3 inPosition, [Const, Ref] Quat inRotation, [Const] Shape inShape, unsigned long inUserData);
 };
 
 CompoundShapeSettings implements ShapeSettings;
@@ -1154,6 +1178,7 @@ interface MeshShapeSettings {
 	attribute unsigned long mMaxTrianglesPerLeaf;
 	attribute float mActiveEdgeCosThresholdAngle;
 	attribute boolean mPerTriangleUserData;
+	attribute MeshShapeSettings_EBuildQuality mBuildQuality;
 };
 
 MeshShapeSettings implements ShapeSettings;
@@ -1263,8 +1288,8 @@ interface Constraint {
 	void SetEnabled(boolean inEnabled);
 	boolean GetEnabled();
 	boolean IsActive();
-	unsigned long long GetUserData();
-	void SetUserData(unsigned long long inUserData);
+	unsigned long GetUserData();
+	void SetUserData(unsigned long inUserData);
 	void ResetWarmStart();
 	void SaveState([Ref] StateRecorder inStream);
 	void RestoreState([Ref] StateRecorder inStream);
@@ -1405,6 +1430,7 @@ interface HingeConstraint {
 	float GetTargetAngularVelocity();
 	void SetTargetAngle(float inAngle);
 	float GetTargetAngle();
+	void SetTargetOrientationBS([Const, Ref] Quat inOrientation);
 	void SetLimits(float inLimitsMin, float inLimitsMax);
 	float GetLimitsMin();
 	float GetLimitsMax();
@@ -1887,8 +1913,8 @@ interface Body {
 	[Value] SoftBodyCreationSettings GetSoftBodyCreationSettings();
 	MotionProperties GetMotionProperties();
 	[Const, Value] Vec3 GetWorldSpaceSurfaceNormal([Const, Ref] SubShapeID inSubShapeID, [Const, Ref] RVec3 inPosition);
-	unsigned long long GetUserData();
-	void SetUserData(unsigned long long inUserData);
+	unsigned long GetUserData();
+	void SetUserData(unsigned long inUserData);
 	void SaveState([Ref] StateRecorder inStream);
 	void RestoreState([Ref] StateRecorder inStream);
 };
@@ -1966,8 +1992,16 @@ interface BodyInterface {
 	float GetFriction([Const, Ref] BodyID inBodyID);
 	void SetGravityFactor([Const, Ref] BodyID inBodyID, float inFactor);
 	float GetGravityFactor([Const, Ref] BodyID inBodyID);
+	void SetMaxLinearVelocity([Const, Ref] BodyID inBodyID, float inLinearVelocity);
+	float GetMaxLinearVelocity([Const, Ref] BodyID inBodyID);
+	void SetMaxAngularVelocity([Const, Ref] BodyID inBodyID, float inAngularVelocity);
+	float GetMaxAngularVelocity([Const, Ref] BodyID inBodyID);
 	void SetUseManifoldReduction([Const, Ref] BodyID inBodyID, boolean inUseReduction);
 	boolean GetUseManifoldReduction([Const, Ref] BodyID inBodyID);
+	void SetIsSensor([Const, Ref] BodyID inBodyID, boolean inIsSensor);
+	boolean IsSensor([Const, Ref] BodyID inBodyID);
+	void SetCollisionGroup([Const, Ref] BodyID inBodyID, [Const, Ref] CollisionGroup inCollisionGroup);
+	[Const, Ref] CollisionGroup GetCollisionGroup([Const, Ref] BodyID inBodyID);
 	void AddForce([Const, Ref] BodyID inBodyID, [Const, Ref] Vec3 inForce, EActivation inActivationMode);
 	void AddForce([Const, Ref] BodyID inBodyID, [Const, Ref] Vec3 inForce, [Const, Ref] RVec3 inPoint, EActivation inActivationMode);
 	void AddTorque([Const, Ref] BodyID inBodyID, [Const, Ref] Vec3 inTorque, EActivation inActivationMode);
@@ -1977,8 +2011,8 @@ interface BodyInterface {
 	void AddImpulse([Const, Ref] BodyID inBodyID, [Const, Ref] Vec3 inImpulse, [Const, Ref] RVec3 inPosition);
 	void AddAngularImpulse([Const, Ref] BodyID inBodyID, [Const, Ref] Vec3 inAngularImpulse);
 	[Value] TransformedShape GetTransformedShape([Const, Ref] BodyID inBodyID);
-	unsigned long long GetUserData([Const, Ref] BodyID inBodyID);
-	void SetUserData([Const, Ref] BodyID inBodyID, unsigned long long inUserData);
+	unsigned long GetUserData([Const, Ref] BodyID inBodyID);
+	void SetUserData([Const, Ref] BodyID inBodyID, unsigned long inUserData);
 	[Const] PhysicsMaterial GetMaterial([Const, Ref] BodyID inBodyID, [Const, Ref] SubShapeID inSubShapeID);
 	void InvalidateContactCache([Const, Ref] BodyID inBodyID);
 };
@@ -2050,7 +2084,7 @@ interface PhysicsSettings {
 	attribute float mPenetrationSlop;
 	attribute float mLinearCastThreshold;
 	attribute float mLinearCastMaxPenetration;
-	attribute float mManifoldToleranceSq;
+	attribute float mManifoldTolerance;
 	attribute float mMaxPenetrationDistance;
 	attribute float mBodyPairCacheMaxDeltaPositionSq;
 	attribute float mBodyPairCacheCosMaxDeltaRotationDiv2;
@@ -2251,6 +2285,7 @@ interface BroadPhaseQuery {
 	void CollidePoint([Const, Ref] Vec3 inPoint, [Ref] CollideShapeBodyCollector ioCollector, [Const, Ref] BroadPhaseLayerFilter inBroadPhaseFilter, [Const, Ref] ObjectLayerFilter inObjectLayerFilter);
 	void CollideOrientedBox([Const, Ref] OrientedBox inBox, [Ref] CollideShapeBodyCollector ioCollector, [Const, Ref] BroadPhaseLayerFilter inBroadPhaseFilter, [Const, Ref] ObjectLayerFilter inObjectLayerFilter);
 	void CastAABox([Const, Ref] AABoxCast inBox, [Ref] CastShapeBodyCollector ioCollector, [Const, Ref] BroadPhaseLayerFilter inBroadPhaseFilter, [Const, Ref] ObjectLayerFilter inObjectLayerFilter);
+	[Const, Value] AABox GetBounds();
 };
 
 interface RayCastSettings {
@@ -2283,6 +2318,7 @@ interface CastRayCollectorJS {
 };
 
 interface ArrayRayCastResult {
+	void ArrayRayCastResult();
 	boolean empty();
 	long size();
 	[Ref] RayCastResult at(long inIndex);
@@ -2345,6 +2381,7 @@ interface CollidePointCollectorJS {
 };
 
 interface ArrayCollidePointResult {
+	void ArrayCollidePointResult();
 	boolean empty();
 	long size();
 	[Ref] CollidePointResult at(long inIndex);
@@ -2417,6 +2454,7 @@ interface CollideShapeCollectorJS {
 };
 
 interface ArrayCollideShapeResult {
+	void ArrayCollideShapeResult();
 	boolean empty();
 	long size();
 	[Ref] CollideShapeResult at(long inIndex);
@@ -2492,6 +2530,7 @@ interface CastShapeCollectorJS {
 };
 
 interface ArrayShapeCastResult {
+	void ArrayShapeCastResult();
 	boolean empty();
 	long size();
 	[Ref] ShapeCastResult at(long inIndex);
@@ -2574,11 +2613,16 @@ interface PhysicsStepListenerJS {
 interface BodyActivationListener {
 };
 
-[JSImplementation="BodyActivationListener"]
+interface BodyActivationListenerEm {
+};
+
+BodyActivationListenerEm implements BodyActivationListener;
+
+[JSImplementation="BodyActivationListenerEm"]
 interface BodyActivationListenerJS {
 	void BodyActivationListenerJS();
-	void OnBodyActivated([Const, Ref] BodyID inBodyID, unsigned long long inBodyUserData);
-	void OnBodyDeactivated([Const, Ref] BodyID inBodyID, unsigned long long inBodyUserData);
+	void OnBodyActivated([Const, Ref] BodyID inBodyID, unsigned long inBodyUserData);
+	void OnBodyDeactivated([Const, Ref] BodyID inBodyID, unsigned long inBodyUserData);
 };
 
 interface BodyIDVector {
@@ -2656,7 +2700,7 @@ interface BodyCreationSettings {
 	[Value] attribute Quat mRotation;
 	[Value] attribute Vec3 mLinearVelocity;
 	[Value] attribute Vec3 mAngularVelocity;
-	attribute unsigned long long mUserData;
+	attribute unsigned long mUserData;
 	attribute unsigned long mObjectLayer;
 	[Value] attribute CollisionGroup mCollisionGroup;
 	attribute EMotionType mMotionType;
@@ -2750,7 +2794,26 @@ interface SoftBodySharedSettingsLRA {
 	attribute float mMaxDistance;
 };
 
+interface SoftBodySharedSettingsRodStretchShear {
+	void SoftBodySharedSettingsRodStretchShear(unsigned long inVertex1, unsigned long inVertex2, float inCompliance);
+
+	attribute unsigned long[] mVertex;
+	attribute float mLength;
+	attribute float mInvMass;
+	attribute float mCompliance;
+	[Value] attribute Quat mBishop;
+};
+
+interface SoftBodySharedSettingsRodBendTwist {
+	void SoftBodySharedSettingsRodBendTwist(unsigned long inRod1, unsigned long inRod2, float inCompliance);
+
+	attribute unsigned long[] mRod;
+	attribute float mCompliance;
+	[Value] attribute Quat mOmega0;
+};
+
 interface ArraySoftBodySharedSettingsVertex {
+	void ArraySoftBodySharedSettingsVertex();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsVertex at(long inIndex);
@@ -2761,6 +2824,7 @@ interface ArraySoftBodySharedSettingsVertex {
 };
 
 interface ArraySoftBodySharedSettingsFace {
+	void ArraySoftBodySharedSettingsFace();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsFace at(long inIndex);
@@ -2771,6 +2835,7 @@ interface ArraySoftBodySharedSettingsFace {
 };
 
 interface ArraySoftBodySharedSettingsEdge {
+	void ArraySoftBodySharedSettingsEdge();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsEdge at(long inIndex);
@@ -2781,6 +2846,7 @@ interface ArraySoftBodySharedSettingsEdge {
 };
 
 interface ArraySoftBodySharedSettingsDihedralBend {
+	void ArraySoftBodySharedSettingsDihedralBend();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsDihedralBend at(long inIndex);
@@ -2791,6 +2857,7 @@ interface ArraySoftBodySharedSettingsDihedralBend {
 };
 
 interface ArraySoftBodySharedSettingsVolume {
+	void ArraySoftBodySharedSettingsVolume();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsVolume at(long inIndex);
@@ -2801,6 +2868,7 @@ interface ArraySoftBodySharedSettingsVolume {
 };
 
 interface ArraySoftBodySharedSettingsInvBind {
+	void ArraySoftBodySharedSettingsInvBind();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsInvBind at(long inIndex);
@@ -2811,6 +2879,7 @@ interface ArraySoftBodySharedSettingsInvBind {
 };
 
 interface ArraySoftBodySharedSettingsSkinned {
+	void ArraySoftBodySharedSettingsSkinned();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsSkinned at(long inIndex);
@@ -2821,10 +2890,33 @@ interface ArraySoftBodySharedSettingsSkinned {
 };
 
 interface ArraySoftBodySharedSettingsLRA {
+	void ArraySoftBodySharedSettingsLRA();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsLRA at(long inIndex);
 	void push_back([Const, Ref] SoftBodySharedSettingsLRA inValue);
+	void reserve(unsigned long inSize);
+	void resize(unsigned long inSize);
+	void clear();
+};
+
+interface ArraySoftBodySharedSettingsRodStretchShear {
+	void ArraySoftBodySharedSettingsRodStretchShear();
+	boolean empty();
+	long size();
+	[Ref] SoftBodySharedSettingsRodStretchShear at(long inIndex);
+	void push_back([Const, Ref] SoftBodySharedSettingsRodStretchShear inValue);
+	void reserve(unsigned long inSize);
+	void resize(unsigned long inSize);
+	void clear();
+};
+
+interface ArraySoftBodySharedSettingsRodBendTwist {
+	void ArraySoftBodySharedSettingsRodBendTwist();
+	boolean empty();
+	long size();
+	[Ref] SoftBodySharedSettingsRodBendTwist at(long inIndex);
+	void push_back([Const, Ref] SoftBodySharedSettingsRodBendTwist inValue);
 	void reserve(unsigned long inSize);
 	void resize(unsigned long inSize);
 	void clear();
@@ -2841,6 +2933,7 @@ interface SoftBodySharedSettingsVertexAttributes {
 };
 
 interface ArraySoftBodySharedSettingsVertexAttributes {
+	void ArraySoftBodySharedSettingsVertexAttributes();
 	boolean empty();
 	long size();
 	[Ref] SoftBodySharedSettingsVertexAttributes at(long inIndex);
@@ -2859,6 +2952,7 @@ interface SoftBodySharedSettings {
 	void CreateConstraints(SoftBodySharedSettingsVertexAttributes inVertexAttributes, unsigned long inVertexAttributesLength, optional SoftBodySharedSettings_EBendType inBendType, optional float inAngleTolerance);
 	void AddFace([Const, Ref] SoftBodySharedSettingsFace inFace);
 	void CalculateEdgeLengths();
+	void CalculateRodProperties();
 	void CalculateLRALengths();
 	void CalculateBendConstraintConstants();
 	void CalculateVolumeConstraintVolumes();
@@ -2874,8 +2968,9 @@ interface SoftBodySharedSettings {
 	[Value] attribute ArraySoftBodySharedSettingsSkinned mSkinnedConstraints;
 	[Value] attribute ArraySoftBodySharedSettingsInvBind mInvBindMatrices;
 	[Value] attribute ArraySoftBodySharedSettingsLRA mLRAConstraints;
+	[Value] attribute ArraySoftBodySharedSettingsRodStretchShear mRodStretchShearConstraints;
+	[Value] attribute ArraySoftBodySharedSettingsRodBendTwist mRodBendTwistConstraints;
 	[Value] attribute PhysicsMaterialList mMaterials;
-	attribute float mVertexRadius;
 };
 
 interface SoftBodyCreationSettings {
@@ -2883,7 +2978,7 @@ interface SoftBodyCreationSettings {
 
 	[Value] attribute RVec3 mPosition;
 	[Value] attribute Quat mRotation;
-	attribute unsigned long long mUserData;
+	attribute unsigned long mUserData;
 	attribute unsigned long mObjectLayer;
 	[Value] attribute CollisionGroup mCollisionGroup;
 	attribute unsigned long mNumIterations;
@@ -2893,9 +2988,11 @@ interface SoftBodyCreationSettings {
 	attribute float mFriction;
 	attribute float mPressure;
 	attribute float mGravityFactor;
+	attribute float mVertexRadius;
 	attribute boolean mUpdatePosition;
 	attribute boolean mMakeRotationIdentity;
 	attribute boolean mAllowSleeping;
+	attribute boolean mFacesDoubleSided;
 };
 
 interface SoftBodyVertex {
@@ -2912,6 +3009,7 @@ interface SoftBodyVertexTraits {
 };
 
 interface ArraySoftBodyVertex {
+	void ArraySoftBodyVertex();
 	boolean empty();
 	long size();
 	[Ref] SoftBodyVertex at(long inIndex);
@@ -2925,6 +3023,8 @@ interface SoftBodyMotionProperties {
 	[Const] SoftBodySharedSettings GetSettings();
 	[Ref] ArraySoftBodyVertex GetVertices();
 	[Ref] SoftBodyVertex GetVertex(unsigned long inIndex);
+	[Value] Quat GetRodRotation(unsigned long inIndex);
+	[Value] Vec3 GetRodAngularVelocity(unsigned long inIndex);
 	[Const, Ref] PhysicsMaterialList GetMaterials();
 	[Const, Ref] ArraySoftBodySharedSettingsFace GetFaces();
 	[Const, Ref] SoftBodySharedSettingsFace GetFace(unsigned long inIndex);
@@ -2938,6 +3038,8 @@ interface SoftBodyMotionProperties {
 	void SetEnableSkinConstraints(boolean inEnableSkinConstraints);
 	float GetSkinnedMaxDistanceMultiplier();
 	void SetSkinnedMaxDistanceMultiplier(float inSkinnedMaxDistanceMultiplier);
+	float GetVertexRadius();
+	void SetVertexRadius(float inVertexRadius);
 	[Const, Ref] AABox GetLocalBounds();
 	void CustomUpdate(float inDeltaTime, [Ref] Body ioSoftBody, [Ref] PhysicsSystem inSystem);
 	void SkinVertices([Const, Ref] RMat44 inRootTransform, Mat44MemRef inJointMatrices, unsigned long inNumJoints, boolean inHardSkinAll, [Ref] TempAllocator ioTempAllocator);
@@ -2964,9 +3066,18 @@ interface CharacterBaseSettings {
 	[Const] attribute Shape mShape;
 };
 
+interface CharacterID {
+	void CharacterID();
+	unsigned long GetValue();
+	boolean IsInvalid();
+	[Value] static CharacterID sNextCharacterID();
+	static void sSetNextCharacterID(unsigned long inNextValue);
+};
+
 interface CharacterVirtualSettings {
 	void CharacterVirtualSettings();
 
+	[Value] attribute CharacterID mID;
 	attribute float mMass;
 	attribute float mMaxStrength;
 	[Value] attribute Vec3 mShapeOffset;
@@ -2981,6 +3092,7 @@ interface CharacterVirtualSettings {
 	attribute float mHitReductionCosMaxAngle;
 	attribute float mPenetrationRecoverySpeed;
 	[Const] attribute Shape mInnerBodyShape;
+	[Value] attribute BodyID mInnerBodyIDOverride;
 	attribute unsigned long mInnerBodyLayer;
 };
 
@@ -3008,7 +3120,11 @@ interface CharacterContactListenerJS {
 	boolean OnContactValidate([Const] CharacterVirtual inCharacter, [Const, Ref] BodyID inBodyID2, [Const, Ref] SubShapeID inSubShapeID2);
 	boolean OnCharacterContactValidate([Const] CharacterVirtual inCharacter, [Const] CharacterVirtual inOtherCharacter, [Const, Ref] SubShapeID inSubShapeID2);
 	void OnContactAdded([Const] CharacterVirtual inCharacter, [Const, Ref] BodyID inBodyID2, [Const, Ref] SubShapeID inSubShapeID2, [Const] RVec3 inContactPosition, [Const] Vec3 inContactNormal, [Ref] CharacterContactSettings ioSettings);
+	void OnContactPersisted([Const] CharacterVirtual inCharacter, [Const, Ref] BodyID inBodyID2, [Const, Ref] SubShapeID inSubShapeID2, [Const] RVec3 inContactPosition, [Const] Vec3 inContactNormal, [Ref] CharacterContactSettings ioSettings);
+	void OnContactRemoved([Const] CharacterVirtual inCharacter, [Const, Ref] BodyID inBodyID2, [Const, Ref] SubShapeID inSubShapeID2);
 	void OnCharacterContactAdded([Const] CharacterVirtual inCharacter, [Const] CharacterVirtual inOtherCharacter, [Const, Ref] SubShapeID inSubShapeID2, [Const] RVec3 inContactPosition, [Const] Vec3 inContactNormal, [Ref] CharacterContactSettings ioSettings);
+	void OnCharacterContactPersisted([Const] CharacterVirtual inCharacter, [Const] CharacterVirtual inOtherCharacter, [Const, Ref] SubShapeID inSubShapeID2, [Const] RVec3 inContactPosition, [Const] Vec3 inContactNormal, [Ref] CharacterContactSettings ioSettings);
+	void OnCharacterContactRemoved([Const] CharacterVirtual inCharacter, [Const, Ref] CharacterID inOtherCharacter, [Const, Ref] SubShapeID inSubShapeID2);
 	void OnContactSolve([Const] CharacterVirtual inCharacter, [Const, Ref] BodyID inBodyID2, [Const, Ref] SubShapeID inSubShapeID2, [Const] RVec3 inContactPosition, [Const] Vec3 inContactNormal, [Const] Vec3 inContactVelocity, [Const] PhysicsMaterial inContactMaterial, [Const] Vec3 inCharacterVelocity, [Ref] Vec3 ioNewCharacterVelocity);
 	void OnCharacterContactSolve([Const] CharacterVirtual inCharacter, [Const] CharacterVirtual inOtherCharacter, [Const, Ref] SubShapeID inSubShapeID2, [Const] RVec3 inContactPosition, [Const] Vec3 inContactNormal, [Const] Vec3 inContactVelocity, [Const] PhysicsMaterial inContactMaterial, [Const] Vec3 inCharacterVelocity, [Ref] Vec3 ioNewCharacterVelocity);
 };
@@ -3046,11 +3162,12 @@ interface CharacterVirtualContact {
 	attribute float mDistance;
 	attribute float mFraction;
 	[Value] attribute BodyID mBodyB;
-	attribute CharacterVirtual mCharacterB;
+	[Value] attribute CharacterID mCharacterIDB;
 	[Value] attribute SubShapeID mSubShapeIDB;
 	attribute EMotionType mMotionTypeB;
 	attribute boolean mIsSensorB;
-	attribute unsigned long long mUserData;
+	[Const] attribute CharacterVirtual mCharacterB;
+	attribute unsigned long mUserData;
 	[Const] attribute PhysicsMaterial mMaterial;
 	attribute boolean mHadCollision;
 	attribute boolean mWasDiscarded;
@@ -3058,6 +3175,7 @@ interface CharacterVirtualContact {
 };
 
 interface ArrayCharacterVirtualContact {
+	void ArrayCharacterVirtualContact();
 	boolean empty();
 	long size();
 	[Const, Ref] CharacterVirtualContact at(long inIndex);
@@ -3089,11 +3207,17 @@ interface DefaultBroadPhaseLayerFilter {
 	void DefaultBroadPhaseLayerFilter([Const, Ref] ObjectVsBroadPhaseLayerFilter inFilter, unsigned long inObjectLayer);
 };
 
-DefaultBroadPhaseLayerFilter implements ObjectLayerFilter;
+DefaultBroadPhaseLayerFilter implements BroadPhaseLayerFilter;
 
 interface ObjectLayerFilter {
 	void ObjectLayerFilter();
 };
+
+interface SpecifiedBroadPhaseLayerFilter {
+	void SpecifiedBroadPhaseLayerFilter([Const, Ref] BroadPhaseLayer inBroadPhaseLayer);
+};
+
+SpecifiedBroadPhaseLayerFilter implements BroadPhaseLayerFilter;
 
 [JSImplementation="ObjectLayerFilter"]
 interface ObjectLayerFilterJS {
@@ -3199,6 +3323,7 @@ interface CharacterBase {
 
 interface CharacterVirtual {
 	void CharacterVirtual([Const] CharacterVirtualSettings inSettings, [Ref] RVec3 inPosition, [Ref] Quat inRotation, PhysicsSystem inSystem);
+	[Const, Ref] CharacterID GetID();
 	void SetListener(CharacterContactListener inListener);
 	void SetCharacterVsCharacterCollision(CharacterVsCharacterCollision inCharacterVsCharacterCollision);
 	CharacterContactListener GetListener();
@@ -3225,9 +3350,11 @@ interface CharacterVirtual {
 	boolean GetMaxHitsExceeded();
 	[Value] Vec3 GetShapeOffset();
 	void SetShapeOffset([Const, Ref] Vec3 inShapeOffset);
-	unsigned long long GetUserData();
-	void SetUserData(unsigned long long inUserData);
+	unsigned long GetUserData();
+	void SetUserData(unsigned long inUserData);
 	[Value] BodyID GetInnerBodyID();
+	void StartTrackingContactChanges();
+	void FinishTrackingContactChanges();
 	[Value] Vec3 CancelVelocityTowardsSteepSlopes([Const, Ref] Vec3 inDesiredVelocity);
 	void Update(float inDeltaTime, [Const, Ref] Vec3 inGravity, [Const, Ref] BroadPhaseLayerFilter inBroadPhaseLayerFilter, [Const, Ref] ObjectLayerFilter inObjectLayerFilter, [Const, Ref] BodyFilter inBodyFilter, [Const, Ref] ShapeFilter inShapeFilter, [Ref] TempAllocator inAllocator);
 	boolean CanWalkStairs([Const, Ref] Vec3 inLinearVelocity);
@@ -3240,6 +3367,7 @@ interface CharacterVirtual {
 	void SetInnerBodyShape([Const] Shape inShape);
 	[Value] TransformedShape GetTransformedShape();
 	boolean HasCollidedWith([Const, Ref] BodyID inBodyID);
+	[BindTo="HasCollidedWith"] boolean HasCollidedWithCharacterID([Const, Ref] CharacterID inCharacterID);
 	[BindTo="HasCollidedWith"] boolean HasCollidedWithCharacter(CharacterVirtual inCharacter);
 	[Value] ArrayCharacterVirtualContact GetActiveContacts();
 };
@@ -3258,6 +3386,7 @@ interface LinearCurve {
 };
 
 interface ArrayFloat {
+	void ArrayFloat();
 	boolean empty();
 	long size();
 	float at(long inIndex);
@@ -3269,6 +3398,7 @@ interface ArrayFloat {
 };
 
 interface ArrayUint {
+	void ArrayUint();
 	boolean empty();
 	long size();
 	unsigned long at(long inIndex);
@@ -3280,6 +3410,7 @@ interface ArrayUint {
 };
 
 interface ArrayUint8 {
+	void ArrayUint8();
 	boolean empty();
 	long size();
 	octet at(long inIndex);
@@ -3291,6 +3422,7 @@ interface ArrayUint8 {
 };
 
 interface ArrayVehicleAntiRollBar {
+	void ArrayVehicleAntiRollBar();
 	boolean empty();
 	long size();
 	[Ref] VehicleAntiRollBar at(long inIndex);
@@ -3300,6 +3432,7 @@ interface ArrayVehicleAntiRollBar {
 };
 
 interface ArrayWheelSettings {
+	void ArrayWheelSettings();
 	boolean empty();
 	long size();
 	WheelSettings at(long inIndex);
@@ -3309,6 +3442,7 @@ interface ArrayWheelSettings {
 };
 
 interface ArrayVehicleDifferentialSettings {
+	void ArrayVehicleDifferentialSettings();
 	boolean empty();
 	long size();
 	[Ref] VehicleDifferentialSettings at(long inIndex);
@@ -3357,7 +3491,9 @@ VehicleConstraintSettings implements ConstraintSettings;
 interface VehicleConstraint {
 	void VehicleConstraint([Ref] Body inVehicleBody, [Const, Ref] VehicleConstraintSettings inSettings);
 	void SetMaxPitchRollAngle(float inMaxPitchRollAngle);
+	float GetMaxPitchRollAngle();
 	void SetVehicleCollisionTester([Const] VehicleCollisionTester inTester);
+	[Const] VehicleCollisionTester GetVehicleCollisionTester();
 	void OverrideGravity([Const, Ref] Vec3 inGravity);
 	boolean IsGravityOverridden();
 	[Value] Vec3 GetGravityOverride();
@@ -3370,6 +3506,7 @@ interface VehicleConstraint {
 	[Const] Wheel GetWheel(unsigned long inIdx);
 	[Value] Mat44 GetWheelLocalTransform(unsigned long inWheelIndex, [Ref] Vec3 inWheelRight, [Ref] Vec3 inWheelUp);
 	[Value] RMat44 GetWheelWorldTransform(unsigned long inWheelIndex, [Ref] Vec3 inWheelRight, [Ref] Vec3 inWheelUp);
+	[Ref] ArrayVehicleAntiRollBar GetAntiRollBars();
 	void SetNumStepsBetweenCollisionTestActive(unsigned long inSteps);
 	[Const] unsigned long GetNumStepsBetweenCollisionTestActive();
 	void SetNumStepsBetweenCollisionTestInactive(unsigned long inSteps);
@@ -3622,9 +3759,6 @@ interface VehicleControllerSettings {
 };
 
 interface VehicleController {
-	unsigned long GetRefCount();
-	void AddRef();
-	void Release();
 	[Ref] VehicleConstraint GetConstraint();
 };
 
@@ -3784,9 +3918,10 @@ interface ArrayRagdollAdditionalConstraint {
 interface RagdollSettings {
 	void RagdollSettings();
 	boolean Stabilize();
-	Ragdoll CreateRagdoll(long inCollisionGroup, long inUserData, PhysicsSystem inSystem);
+	Ragdoll CreateRagdoll(long inCollisionGroup, unsigned long inUserData, PhysicsSystem inSystem);
 	Skeleton GetSkeleton();
 	void DisableParentChildCollisions([Const] optional Mat44MemRef inJointMatrices, optional float inMinSeparationDistance);
+	void CalculateConstraintPriorities(optional long inBasePriority);
 	void CalculateBodyIndexToConstraintIndex();
 	void CalculateConstraintIndexToBodyIdxPair();
 
@@ -3886,6 +4021,15 @@ interface ObjectLayerPairFilterMask {
 
 ObjectLayerPairFilterMask implements ObjectLayerPairFilter;
 
+interface AssertFailedHandler {
+};
+
+[JSImplementation="AssertFailedHandler"]
+interface AssertFailedHandlerJS {
+	void AssertFailedHandlerJS();
+	void OnAssertFailed([Const] DOMString inExpression, [Const] DOMString inMessage, [Const] DOMString inFile, unsigned long inLine);
+};
+
 interface JoltSettings {
 	void JoltSettings();
 
@@ -3896,6 +4040,7 @@ interface JoltSettings {
 	attribute BroadPhaseLayerInterface mBroadPhaseLayerInterface;
 	attribute ObjectVsBroadPhaseLayerFilter mObjectVsBroadPhaseLayerFilter;
 	attribute ObjectLayerPairFilter mObjectLayerPairFilter;
+	attribute AssertFailedHandler mAssertFailedHandler;
 };
 
 interface JoltInterface {
@@ -3905,8 +4050,9 @@ interface JoltInterface {
 	TempAllocator GetTempAllocator();
 	ObjectLayerPairFilter GetObjectLayerPairFilter();
 	ObjectVsBroadPhaseLayerFilter GetObjectVsBroadPhaseLayerFilter();
-	static unsigned long long sGetTotalMemory();
-	static unsigned long long sGetFreeMemory();
+	static unsigned long sGetTotalMemory();
+	static unsigned long sGetFreeMemory();
+	static Body sGetFixedToWorldBody();
 };
 
 interface SynthesisHelper {

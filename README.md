@@ -13,11 +13,13 @@ Go to the [demos page](https://jrouwe.github.io/JoltPhysics.js/) to see the proj
 
 ## Using
 
-This library comes in 5 flavours:
+This library comes in 7 flavours:
 - `wasm-compat` - A WASM version with the WASM file (encoded in base64) embedded in the bundle
+- `debug-wasm-compat` - Same as `wasm-compat` but with debug checking enabled (outputs errors to the console and enables the debug renderer).
 - `wasm` - A WASM version with a separate WASM file
 - `asm` - A JavaScript version that uses [asm.js](https://developer.mozilla.org/en-US/docs/Games/Tools/asm.js)
 - `wasm-compat-multithread` - Same as `wasm-compat` but with multi threading enabled.
+- `debug-wasm-compat-multithread` - Same as `wasm-compat-multithread` but with debug checking enabled (outputs errors to the console and enables the debug renderer).
 - `wasm-multithread` - Same as `wasm` but with multi threading enabled.
 
 See [falling_shapes.html](Examples/falling_shapes.html) for an example on how to use the library.
@@ -43,6 +45,9 @@ The different flavours are available via entrypoints on the npm package:
 import Jolt from 'jolt-physics';
 import Jolt from 'jolt-physics/wasm-compat';
 
+// WASM embedded in the bundle, debug checking enabled (outputs errors to the console and enables the debug renderer)
+import Jolt from 'jolt-physics/debug-wasm-compat';
+
 // WASM
 import Jolt from 'jolt-physics/wasm';
 
@@ -51,6 +56,9 @@ import Jolt from 'jolt-physics/asm';
 
 // WASM embedded in the bundle, multithread enabled
 import Jolt from 'jolt-physics/wasm-compat-multithread';
+
+// WASM embedded in the bundle, multithread enabled, debug checking enabled (outputs errors to the console and enables the debug renderer)
+import Jolt from 'jolt-physics/debug-wasm-compat-multithread';
 
 // WASM, multithread enabled
 import Jolt from 'jolt-physics/wasm-multithread';
@@ -93,14 +101,15 @@ This project has only been compiled under Linux.
 
 * Install [emscripten](https://emscripten.org/) and ensure that its environment variables have been setup
 * Install [cmake](https://cmake.org/)
-* Run ```./build.sh Distribution``` for the optimized build, ```./build.sh Debug``` for the debug build.
+* Run ```./build.sh``` to build both the Debug and Distribution build, ```./build.sh Debug``` for only the Debug build.
 
 Additional options that can be provided to ```build.sh```:
 
 * ```-DENABLE_MEMORY_PROFILER=ON``` will enable memory tracking to detect leaks.
 * ```-DDOUBLE_PRECISION=ON``` will enable the double precision mode. This allows worlds larger than a couple of km.
-* ```-DENABLE_SIMD=ON``` will enable SIMD instructions. Safari 16.4 was the last major browser to support this (in March 2023).
+* ```-DENABLE_SIMD=ON``` will enable SIMD instructions. Safari 16.4 was the last major browser to support this (in March 2023). The multithreaded builds have this on by default.
 * ```-DBUILD_WASM_COMPAT_ONLY=ON``` speeds up the build by only compiling the WASM compat version which the examples use.
+* ```-DCROSS_PLATFORM_DETERMINISTIC=ON``` builds the library so that it produces the same results as the native version of the library. For more info [click here](https://jrouwe.github.io/JoltPhysics/#deterministic-simulation).
 
 ## Running
 
@@ -113,7 +122,7 @@ npm install
 npm run examples
 ```
 
-Then navigate to: http://localhost:3000/
+Then navigate to: [http://localhost:3000/](http://localhost:3000/)
 
 If you need to debug the C++ code take a look at [WASM debugging](https://developer.chrome.com/blog/wasm-debugging-2020/).
 
@@ -127,14 +136,21 @@ On top of this, Jolt uses reference counting for a number of its classes (everyt
 * Shape
 * ConstraintSettings
 * Constraint
+* PathConstraintPath
 * PhysicsMaterial
 * GroupFilter
 * SoftBodySharedSettings
 * VehicleCollisionTester
-* VehicleController
+* VehicleControllerSettings
 * WheelSettings
 * CharacterBaseSettings
 * CharacterBase
+* Skeleton
+* SkeletonAnimation
+* SkeletonMapper
+* PhysicsScene
+* RagdollSettings
+* Ragdoll
 
 Reference counting objects start with a reference count of 0. If you want to keep ownership over the object, you need to call ```object.AddRef()```, this will increment the reference count. If you want to release ownership you call ```object.Release()```, this will decrement the reference count and if the reference count reaches 0 the object will be destroyed. If, after newing, you pass a reference counted object on to another object (e.g. a ShapeSettings to a CompoundShapeSettings or a Shape to a Body) then that other object will take a reference, in that case it is not needed take a reference yourself beforehand so you can skip the calls to ```AddRef/Release```. Note that it is also possible to do ```new Jolt.XXX``` followed by ```Jolt.destroy(...)``` for a reference counted object if no one took a reference.
 
@@ -148,6 +164,7 @@ Almost everything else can be destroyed straight after it has been passed to Jol
 * [GDevelop](https://gdevelop.io/) - An Open-source, cross-platform 2D/3D/multiplayer game engine. See [announcement](https://github.com/4ian/GDevelop/releases/tag/v5.5.220).
 * [react-three-jolt](https://github.com/pmndrs/react-three-jolt) - Wraps Jolt to make it easy to use in react-three-fiber.
 * [r3f-jolt](https://github.com/sajal353/r3f-jolt) - Another wrapper for react-three-fiber.
+* [Synthesis](https://github.com/Autodesk/synthesis) - A Robotics Simulator for Autodesk Fusion CAD Designs
 
 ## License
 

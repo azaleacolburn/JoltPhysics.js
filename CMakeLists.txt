@@ -27,6 +27,15 @@ option(ENABLE_SIMD "Enable SIMD instructions (warning: last major browser to sup
 # Option to speed up compilation by only compiling the WASM compat version
 option(BUILD_WASM_COMPAT_ONLY "Compile online the WASM compat version of the library (speeds up compilation)" OFF)
 
+# Enable for resizable heap, with some amount of slowness
+option(ALLOW_MEMORY_GROWTH "Allow Memory Growth" OFF)
+
+# Default initial memory size is 128*1024*1024 = 128MB
+set(INITIAL_MEMORY 134217728 CACHE STRING "Initial Memory")
+
+# Default maximum memory size is 2*1024*1024*1024 = 2GB (only used when ALLOW_MEMORY_GROWTH is true)
+set(MAXIMUM_MEMORY 2147483648 CACHE STRING "Maximum Memory")
+
 # The configurations we support
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Distribution")
 
@@ -55,32 +64,36 @@ set(OBJECT_LAYER_BITS 32)
 
 # Enable multi threading
 if (ENABLE_MULTI_THREADING)
-	set(MULTI_THREADED_FLAG 
-		-pthread 
+	set(MULTI_THREADED_FLAG
+		-pthread
 		--post-js ${CMAKE_CURRENT_SOURCE_DIR}/multi-threaded.js
 		-s SHARED_MEMORY)
 	set(ENVIRONMENT_FLAG
-		-s ENVIRONMENT='web,node,worker' 
+		-s ENVIRONMENT=web,node,worker
 		-s PTHREAD_POOL_SIZE=16)
 	set(CMAKE_CXX_FLAGS "-pthread -s SHARED_MEMORY")
 	set(OUTPUT_BASE_NAME "${OUTPUT_FOLDER}jolt-physics.multithread")
 	set(REMOVE_THREAD_LOCAL "")
 else()
 	set(MULTI_THREADED_FLAG "")
-	set(ENVIRONMENT_FLAG "-s ENVIRONMENT='web,node'")
+	set(ENVIRONMENT_FLAG -s ENVIRONMENT=web,node,worker)
 	set(OUTPUT_BASE_NAME "${OUTPUT_FOLDER}jolt-physics")
 	# Tried to keep this multi-platform since windows/mac/linux all treat -i different,
 	# though this creates extra backup file in a non-tracked folder.
 	# Removing 'thread_local' from the generated binding code fixes a small 'residual' allocation
 	# in the proper_cleanup.html demo and it is not needed when in single threaded mode.
-	# See: https://github.com/jrouwe/JoltPhysics.js/discussions/222#discussioncomment-11381106	
+	# See: https://github.com/jrouwe/JoltPhysics.js/discussions/222#discussioncomment-11381106
 	set(REMOVE_THREAD_LOCAL sed -i.bak -e "s:thread_local::g" glue.cpp)
 endif()
 
+# Replace 'replace_by_import' by 'import' in the generated JS code to workaround a bug in emscripten
+# See: https://github.com/jrouwe/JoltPhysics.js/issues/245
+set(REPLACE_IMPORT sed -i -e "s:replace_by_import:import:g")
+
 # Enable SIMD flags
 if (ENABLE_SIMD)
-	set(ENABLE_SIMD_FLAG 
-		-msimd128 
+	set(ENABLE_SIMD_FLAG
+		-msimd128
 		-msse4.2)
 	set(USE_WASM_SIMD ON)
 else()
@@ -93,16 +106,19 @@ include(FetchContent)
 FetchContent_Declare(
         JoltPhysics
         GIT_REPOSITORY "https://github.com/jrouwe/JoltPhysics"
-        GIT_TAG "636b0802665880bb617716a8b03e7de79a2b3dfd"
+        GIT_TAG "v5.5.0"
 		SOURCE_SUBDIR "Build"
 )
 FetchContent_MakeAvailable(JoltPhysics)
 
-# Default is 64*1024*1024 = 64MB
-set(TOTAL_MEMORY 67108864 CACHE STRING "Total Memory")
-
-# Enable for resizable heap, with some amount of slowness
-set(ALLOW_MEMORY_GROWTH 1 CACHE STRING "Allow Memory Growth")
+# Enable resizable heap, with some amount of slowness. Default is 128*1024*1024 = 128MB
+if (ALLOW_MEMORY_GROWTH)
+	set(MEMORY_GROWTH_FLAG
+		-s ALLOW_MEMORY_GROWTH=1
+		-s MAXIMUM_MEMORY=${MAXIMUM_MEMORY})
+else()
+	set(MEMORY_GROWTH_FLAG "")
+endif()
 
 # Enable memory profiler
 if (ENABLE_MEMORY_PROFILER)
@@ -120,39 +136,43 @@ set(EMCC_ARGS
   --extern-pre-js ${JOLT_FRONT_MATTER_FILE}
   --post-js glue.js
   --closure=1
+  --closure-args="--dynamic_import_alias=replace_by_import"
+  --closure-args="--externs"
+  --closure-args="${CMAKE_CURRENT_SOURCE_DIR}/extern-import.js"
   ${MULTI_THREADED_FLAG}
   --post-js ${CMAKE_CURRENT_SOURCE_DIR}/helpers.js
-  -s ALLOW_MEMORY_GROWTH=${ALLOW_MEMORY_GROWTH}
+  ${MEMORY_GROWTH_FLAG}
   -s ALLOW_TABLE_GROWTH=1
+  -s WASM_BIGINT=0
   ${ENVIRONMENT_FLAG}
   -s EXPORT_ES6=1
   -s EXPORT_NAME="Jolt"
   -s MODULARIZE=1
   -s NO_EXIT_RUNTIME=1
   -s NO_FILESYSTEM=1
-  -s TOTAL_STACK=1048576
-  -s TOTAL_MEMORY=${TOTAL_MEMORY}
+  -s STACK_SIZE=1048576
+  -s INITIAL_MEMORY=${INITIAL_MEMORY}
+  -s EXPORTED_RUNTIME_METHODS=HEAP8,HEAPU8,HEAP16,HEAPU16,HEAP32,HEAPU32,HEAPF32,HEAPF64,UTF8ToString
   ${MEMORY_PROFILER_FLAG}
   ${INCLUDE_DEMANGLE_ALL_FLAG}
   ${ENABLE_SIMD_FLAG})
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-	message("Compiling with debug")
-	set(EMCC_ARGS 
-		${EMCC_ARGS} 
+	set(EMCC_ARGS
+		${EMCC_ARGS}
 		-g${JPH_DEBUG_SYMBOL_FORMAT}
 		-s ASSERTIONS)
 else()
-	set(EMCC_ARGS 
-		${EMCC_ARGS} 
+	set(EMCC_ARGS
+		${EMCC_ARGS}
 		-O3)
 endif()
 
 set(EMCC_JS_ARGS ${EMCC_ARGS}
   -s AGGRESSIVE_VARIABLE_ELIMINATION=1
   -s ELIMINATE_DUPLICATE_FUNCTIONS=1
-  -s LEGACY_VM_SUPPORT=1
   -s SINGLE_FILE=1
+  -s LEGACY_VM_SUPPORT=1
   -s WASM=0)
 
 set(EMCC_WASM_ARGS ${EMCC_ARGS}
@@ -206,7 +226,7 @@ add_custom_command(
 	OUTPUT ${JOLT_TYPING}
 	COMMAND npx webidl-dts-gen -e -d -i jolt.idl -o ${JOLT_TYPING} -n Jolt
 	DEPENDS jolt.idl
-	COMMENT "Generating JoltPhysics.js bindings"
+	COMMENT "Generating JoltPhysics.js typing"
 	VERBATIM)
 
 add_custom_command(
@@ -242,6 +262,7 @@ if (NOT BUILD_WASM_COMPAT_ONLY)
 	add_custom_command(
 		OUTPUT ${OUTPUT_BASE_NAME}.wasm.js ${OUTPUT_BASE_NAME}.wasm.wasm
 		COMMAND emcc glue.o $<TARGET_FILE:Jolt> ${EMCC_WASM_ARGS} -o ${OUTPUT_BASE_NAME}.wasm.js
+		COMMAND ${REPLACE_IMPORT} ${OUTPUT_BASE_NAME}.wasm.js
 		DEPENDS jolt-bindings ${JOLT_FRONT_MATTER_FILE} ${JOLT_TARGETS} ${JOLT_IDL_FILE} ${JOLT_HEADER_FILE}
 		COMMENT "Building JoltPhysics.js webassembly"
 		VERBATIM)
@@ -251,6 +272,7 @@ endif()
 add_custom_command(
 	OUTPUT ${OUTPUT_BASE_NAME}.wasm-compat.js
 	COMMAND emcc glue.o $<TARGET_FILE:Jolt> ${EMCC_WASM_COMPAT_ARGS} -o ${OUTPUT_BASE_NAME}.wasm-compat.js
+	COMMAND ${REPLACE_IMPORT} ${OUTPUT_BASE_NAME}.wasm-compat.js
 	DEPENDS jolt-bindings ${JOLT_FRONT_MATTER_FILE} ${JOLT_TARGETS} ${JOLT_IDL_FILE} ${JOLT_HEADER_FILE}
 	COMMENT "Building JoltPhysics.js compat webassembly"
 	VERBATIM)
