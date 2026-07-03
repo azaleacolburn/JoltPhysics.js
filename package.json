@@ -1,6 +1,6 @@
 {
 	"name": "@azalea-colburn/jolt-physics",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "A WebAssembly port of JoltPhysics, a rigid body physics and collision detection library, suitable for games and VR applications",
 	"type": "module",
 	"main": "dist/jolt-physics.wasm-compat.js",
@@ -93,5 +93,4 @@
 		"express": "^4.19.2",
 		"webidl-dts-gen": "^1.11.0"
 	}
->>>>>>> d054f5af976a92f5de182cd903c3d187797c4534
 }
