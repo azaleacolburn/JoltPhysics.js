@@ -1,5 +1,5 @@
 {
-	"name": "@azalea-colburn/jolt-physics",
+	"name": "@azaleacolburn/jolt-physics",
 	"version": "1.0.1",
 	"description": "A WebAssembly port of JoltPhysics, a rigid body physics and collision detection library, suitable for games and VR applications",
 	"type": "module",
