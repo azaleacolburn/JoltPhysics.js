@@ -24,22 +24,24 @@ rm -rf ./dist
 
 mkdir dist
 
+MEMORY_ARGS="-DALLOW_MEMORY_GROWTH=ON -DINITIAL_MEMORY=268435456"
+
 if [ $BUILD_TYPE != "Debug" ]
 then
-	cmake -B Build/Debug/ST -DCMAKE_BUILD_TYPE=Debug -DBUILD_WASM_COMPAT_ONLY=ON $EMSCRIPTEN_ARGS "${@}"
+	cmake -B Build/Debug/ST -DCMAKE_BUILD_TYPE=Debug -DBUILD_WASM_COMPAT_ONLY=ON $EMSCRIPTEN_ARGS $MEMORY_ARGS "${@}"
 	cmake --build Build/Debug/ST -j`nproc`
 
-	cmake -B Build/Debug/MT -DENABLE_MULTI_THREADING=ON -DENABLE_SIMD=ON -DCMAKE_BUILD_TYPE=Debug -DBUILD_WASM_COMPAT_ONLY=ON $EMSCRIPTEN_ARGS "${@}"
+	cmake -B Build/Debug/MT -DENABLE_MULTI_THREADING=ON -DENABLE_SIMD=ON -DCMAKE_BUILD_TYPE=Debug -DBUILD_WASM_COMPAT_ONLY=ON $EMSCRIPTEN_ARGS $MEMORY_ARGS "${@}"
 	cmake --build Build/Debug/MT -j`nproc`
 
 	mv ./dist/jolt-physics.wasm-compat.js ./dist/jolt-physics.debug.wasm-compat.js
 	mv ./dist/jolt-physics.multithread.wasm-compat.js ./dist/jolt-physics.debug.multithread.wasm-compat.js
 fi
 
-cmake -B Build/$BUILD_TYPE/ST -DCMAKE_BUILD_TYPE=$BUILD_TYPE $EMSCRIPTEN_ARGS "${@}"
+cmake -B Build/$BUILD_TYPE/ST -DCMAKE_BUILD_TYPE=$BUILD_TYPE $EMSCRIPTEN_ARGS $MEMORY_ARGS "${@}"
 cmake --build Build/$BUILD_TYPE/ST
 
-cmake -B Build/$BUILD_TYPE/MT -DENABLE_MULTI_THREADING=ON -DENABLE_SIMD=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE $EMSCRIPTEN_ARGS "${@}"
+cmake -B Build/$BUILD_TYPE/MT -DENABLE_MULTI_THREADING=ON -DENABLE_SIMD=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE $EMSCRIPTEN_ARGS $MEMORY_ARGS "${@}"
 cmake --build Build/$BUILD_TYPE/MT
 
 if [ $BUILD_TYPE = "Debug" ]
